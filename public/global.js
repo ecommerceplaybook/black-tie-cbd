@@ -648,3 +648,303 @@ document.addEventListener('smootify:loaded', () => {
         }
     });
 });
+
+// FUNCTION: Upsell Slider
+document.addEventListener("DOMContentLoaded", function () {
+  // 1) Grab all slider containers
+  const allSliders = document.querySelectorAll(".mini-cart-upsell_slider");
+
+  // 2) For each slider container, wire up functionality
+  allSliders.forEach((sliderEl, index) => {
+    // Arrows (we assume each slider has exactly 2 arrows)
+    const arrows = sliderEl.querySelectorAll(".mini-cart-upsell_arrow");
+    const leftArrow = arrows[0];
+    const rightArrow = arrows[1];
+
+    // The slides wrapper is presumably inside .slider-container -> .slides-wrapper
+    const slidesWrapper = sliderEl.querySelector(".slider-container .slides-wrapper");
+
+    // If any critical element is missing, skip initialization
+    if (!slidesWrapper || !leftArrow || !rightArrow) {
+      console.warn(`Slider #${index + 1} is missing an arrow or wrapper - skipping.`);
+      return;
+    }
+
+    // Current slide index
+    let currentIndex = 0;
+
+    // We'll store the slides in a variable that we can update
+    let slides = slidesWrapper.querySelectorAll(".slide");
+
+    /**
+     * Update the transform to show the current slide
+     */
+    function updateSliderPosition() {
+      // If we have 0 slides (e.g., dynamic not loaded yet), do nothing
+      if (slides.length === 0) return;
+      slidesWrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
+    }
+
+    /**
+     * Re-fetch the slides whenever new ones appear
+     */
+    function refreshSlides() {
+      slides = slidesWrapper.querySelectorAll(".slide");
+      // If currentIndex is out of range (e.g., slides got removed), clamp it
+      if (currentIndex >= slides.length) {
+        currentIndex = slides.length - 1;
+      }
+      if (currentIndex < 0) {
+        currentIndex = 0;
+      }
+      updateSliderPosition();
+    }
+
+    // Right arrow click
+    rightArrow.addEventListener("click", () => {
+      if (slides.length === 0) return; // no slides to rotate
+      if (currentIndex < slides.length - 1) {
+        currentIndex++;
+      } else {
+        currentIndex = 0; // Loop back
+      }
+      updateSliderPosition();
+    });
+
+    // Left arrow click
+    leftArrow.addEventListener("click", () => {
+      if (slides.length === 0) return; // no slides to rotate
+      if (currentIndex > 0) {
+        currentIndex--;
+      } else {
+        currentIndex = slides.length - 1; // Loop back
+      }
+      updateSliderPosition();
+    });
+
+    // Initial refresh of slides (in case the slider is static or partially loaded)
+    refreshSlides();
+
+    // 3) Set up a MutationObserver to detect dynamic slides being added/removed
+    const observer = new MutationObserver((mutations) => {
+      // If any child elements are added or removed, refresh the slide list
+      mutations.forEach((mutation) => {
+        if (mutation.type === "childList") {
+          refreshSlides();
+        }
+      });
+    });
+
+    // Observe direct children changes inside slidesWrapper
+    observer.observe(slidesWrapper, {
+      childList: true,  // watch direct child addition/removal
+      subtree: false    // or true if slides might be nested deeper
+    });
+  });
+});
+
+// FUNCTION: Update Cart Count
+document.addEventListener('DOMContentLoaded', () => {
+  // Function to update the cart item count
+  function updateCartCount() {
+      // Select all cart-item elements
+      const cartItems = document.querySelectorAll('.mini-cart_items .cart-item');
+      let itemCount = 0;
+
+      // Loop through cart items and count only those that do not contain "Shipping" in .mini-cart_title
+      cartItems.forEach((item) => {
+          const title = item.querySelector('.mini-cart_title');
+          if (title && !title.textContent.includes('Shipping')) {
+              itemCount++;
+          }
+      });
+
+      // Update the text inside the element with the ID 'items'
+      const itemsText = document.getElementById('items');
+      if (itemsText) {
+          itemsText.textContent = `${itemCount} item${itemCount !== 1 ? 's' : ''} in your cart`;
+      }
+  }
+
+  // Initial count on page load
+  updateCartCount();
+
+  // Optional: Observe changes in the cart dynamically
+  const miniCart = document.querySelector('.mini-cart_items');
+  if (miniCart) {
+      const observer = new MutationObserver(updateCartCount);
+      observer.observe(miniCart, { childList: true });
+  }
+});
+
+// FUNCTION: Mini Cart UpSells
+document.addEventListener("DOMContentLoaded", function () {
+  const cartWrapper = document.querySelector('.mini-cart_items'); // Cart items wrapper
+  const upsellSectionMobile = document.querySelector('.mini-cart_upsells'); // Mobile/tablet upsell section
+  const upsellSectionDesktop = document.querySelector('.mini-cart_dropdown-upsells'); // Desktop upsell section
+
+  // Function for Mobile/Tablet (Below 1024px)
+  function handleMobileTabletView() {
+    const isMobile = window.matchMedia("(max-width: 1023px)").matches;
+
+    if (isMobile) {
+      const cartItems = cartWrapper.querySelectorAll('.cart-item');
+      let hasProducts = false;
+
+      // Check each cart item
+      cartItems.forEach((item) => {
+        if (!item.textContent.toLowerCase().includes("shipping")) {
+          hasProducts = true; // Found a product
+        }
+      });
+
+      // Show or hide upsell section for mobile/tablet
+      upsellSectionMobile.style.display = hasProducts ? "block" : "none";
+    } else {
+      upsellSectionMobile.style.display = "none"; // Ensure hidden outside mobile/tablet
+    }
+  }
+
+  // Function for Desktop (1024px and above)
+  function handleDesktopView() {
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+
+    if (isDesktop) {
+      const cartItems = cartWrapper.querySelectorAll('.cart-item');
+      let hasProducts = false;
+
+      // Check each cart item
+      cartItems.forEach((item) => {
+        if (!item.textContent.toLowerCase().includes("shipping")) {
+          hasProducts = true; // Found a product
+        }
+      });
+
+      // Show or hide upsell section for desktop
+      upsellSectionDesktop.style.display = hasProducts ? "block" : "none";
+    } else {
+      upsellSectionDesktop.style.display = "none"; // Ensure hidden outside desktop
+    }
+  }
+
+  // Monitor cart changes and trigger appropriate functions
+  const observer = new MutationObserver(() => {
+    handleMobileTabletView();
+    handleDesktopView();
+  });
+
+  if (cartWrapper) {
+    observer.observe(cartWrapper, { childList: true, subtree: true });
+  }
+
+  // Add resize listener to switch between views dynamically
+  window.addEventListener("resize", () => {
+    handleMobileTabletView();
+    handleDesktopView();
+  });
+
+  // Initial checks
+  handleMobileTabletView();
+  handleDesktopView();
+});
+
+// FUNCTION: Upsell Sliders
+document.addEventListener("DOMContentLoaded", function () {
+  // 1) Grab all slider containers
+  const allSliders = document.querySelectorAll(".mini-cart-upsell_slider");
+
+  // 2) For each slider container, wire up functionality
+  allSliders.forEach((sliderEl, index) => {
+    console.log(`Initializing slider #${index + 1}`);
+
+    // Arrows (we assume each slider has exactly 2 arrows)
+    const arrows = sliderEl.querySelectorAll(".mini-cart-upsell_arrow");
+    const leftArrow = arrows[0];
+    const rightArrow = arrows[1];
+
+    // The slides wrapper is presumably inside .slider-container -> .slides-wrapper
+    const slidesWrapper = sliderEl.querySelector(".slider-container .slides-wrapper");
+
+    // If any critical element is missing, skip initialization
+    if (!slidesWrapper || !leftArrow || !rightArrow) {
+      console.warn(`Slider #${index + 1} is missing an arrow or wrapper - skipping.`);
+      return;
+    }
+
+    // Current slide index
+    let currentIndex = 0;
+
+    // We'll store the slides in a variable that we can update
+    let slides = slidesWrapper.querySelectorAll(".slide");
+
+    /**
+     * Update the transform to show the current slide
+     */
+    function updateSliderPosition() {
+      console.log(`Slider #${index + 1} - currentIndex = ${currentIndex}`);
+      // If we have 0 slides (e.g., dynamic not loaded yet), do nothing
+      if (slides.length === 0) return;
+      slidesWrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
+    }
+
+    /**
+     * Re-fetch the slides whenever new ones appear
+     */
+    function refreshSlides() {
+      slides = slidesWrapper.querySelectorAll(".slide");
+      console.log(`Slider #${index + 1} - slides updated: found ${slides.length} slides`);
+      // If currentIndex is out of range (e.g., slides got removed), clamp it
+      if (currentIndex >= slides.length) {
+        currentIndex = slides.length - 1;
+      }
+      if (currentIndex < 0) {
+        currentIndex = 0;
+      }
+      updateSliderPosition();
+    }
+
+    // Right arrow click
+    rightArrow.addEventListener("click", () => {
+      console.log(`Slider #${index + 1} - Right arrow clicked`);
+      if (slides.length === 0) return; // no slides to rotate
+      if (currentIndex < slides.length - 1) {
+        currentIndex++;
+      } else {
+        currentIndex = 0; // Loop back
+      }
+      updateSliderPosition();
+    });
+
+    // Left arrow click
+    leftArrow.addEventListener("click", () => {
+      console.log(`Slider #${index + 1} - Left arrow clicked`);
+      if (slides.length === 0) return; // no slides to rotate
+      if (currentIndex > 0) {
+        currentIndex--;
+      } else {
+        currentIndex = slides.length - 1; // Loop back
+      }
+      updateSliderPosition();
+    });
+
+    // Initial refresh of slides (in case the slider is static or partially loaded)
+    refreshSlides();
+
+    // 3) Set up a MutationObserver to detect dynamic slides being added/removed
+    const observer = new MutationObserver((mutations) => {
+      // If any child elements are added or removed, refresh the slide list
+      mutations.forEach((mutation) => {
+        if (mutation.type === "childList") {
+          console.log(`Slider #${index + 1} - Detected childList change`);
+          refreshSlides();
+        }
+      });
+    });
+
+    // Observe direct children changes inside slidesWrapper
+    observer.observe(slidesWrapper, {
+      childList: true,  // watch direct child addition/removal
+      subtree: false    // or true if slides might be nested deeper
+    });
+  });
+});
